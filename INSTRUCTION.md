@@ -1,18 +1,21 @@
-Create the kind cluster from the provided config:
 kind create cluster --name todoapp --config cluster.yml
-Bootstrap the cluster (installs NGINX ingress controller and deploys the app):
-chmod +x bootstrap.sh && ./bootstrap.sh
-Apply the Ingress manifest (if not already applied by bootstrap):
-kubectl apply -f ./.infrastructure/ingress/ingress.yml
+kubectl apply -f .infrastructure/mysql/ns.yml
+kubectl apply -f security/rbac.yml
+kubectl apply -f .infrastructure/app/deployment.yml
 
-kubectl wait --for=condition=ready pod/$POD -n todoapp
-kubectl get pod $POD -n todoapp -o jsonpath='{.spec.serviceAccountName}'
 
 # Get the pod name
 POD_NAME=$(kubectl get pods -n todoapp -l app=todoapp -o jsonpath='{.items[0].metadata.name}')
+kubectl wait --for=condition=ready pod/$POD_NAME -n todoapp --timeout=120s
+
+kubectl get sa -n todoapp
+kubectl get role -n todoapp
+kubectl get rolebinding -n todoapp
+kubectl get deploy -n todoapp
 
 # Exec into the pod and run the correct curl command
-kubectl exec -it $POD_NAME -n todoapp -- /bin/sh -c '
-  TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token) && \
-  CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt && \
-  curl --cacert $CACERT --header "Authorization: Bearer $TOKEN" https://kubernetes.default.svc/api/v1/namespaces/todoapp/secrets
+kubectl exec -it $POD_NAME -n todoapp -- /bin/sh -c
+TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token) && \
+CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt && \
+NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace) && \
+curl --cacert $CACERT --header "Authorization: Bearer $TOKEN" https://kubernetes.default.svc/api/v1/namespaces/$NAMESPACE/secrets
